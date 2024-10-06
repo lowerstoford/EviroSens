@@ -54,32 +54,38 @@
     </div>
 
     <script>
-        let device, server, service;
-        const serviceUUID = '0x181a';
-        const characteristicUUIDs = {
-            temperature: '0x2a6e',
-            pressure: '0x2a6d',
-            humidity: '0x2a6f',
-            gas: '0x2a70',
-            light: '0x2a77',
-            accel: '0x2a5a',
-            gyro: '0x2a5b'
+        const SERVICE_UUID = '181a';
+        const CHAR_UUIDS = {
+            TEMP: '2a6e',
+            PRESSURE: '2a6d',
+            HUMIDITY: '2a6f',
+            GAS: '2a70',
+            LIGHT: '2a77',
+            ACCEL: '2a5a',
+            GYRO: '2a5b'
         };
+
+        let device, server, service;
 
         async function connectToBLE() {
             try {
+                console.log('Requesting Bluetooth Device...');
                 device = await navigator.bluetooth.requestDevice({
-                    filters: [{ services: [serviceUUID] }]
+                    filters: [{ services: [SERVICE_UUID] }]
                 });
+
+                console.log('Connecting to GATT Server...');
                 server = await device.gatt.connect();
-                service = await server.getPrimaryService(serviceUUID);
-                
-                for (let [key, uuid] of Object.entries(characteristicUUIDs)) {
+
+                console.log('Getting Environmental Sensing Service...');
+                service = await server.getPrimaryService(SERVICE_UUID);
+
+                for (const [key, uuid] of Object.entries(CHAR_UUIDS)) {
                     const characteristic = await service.getCharacteristic(uuid);
-                    characteristic.addEventListener('characteristicvaluechanged', handleCharacteristicValueChanged);
                     await characteristic.startNotifications();
+                    characteristic.addEventListener('characteristicvaluechanged', handleCharacteristicValueChanged);
                 }
-                
+
                 console.log('Connected to ESP32');
                 document.getElementById('connectBtn').textContent = 'Connected';
             } catch (error) {
@@ -92,27 +98,27 @@
             const uuid = event.target.uuid;
 
             switch (uuid) {
-                case characteristicUUIDs.temperature:
+                case CHAR_UUIDS.TEMP:
                     document.getElementById('temperature').textContent = `${value.getUint16(0, true) / 100} °C`;
                     break;
-                case characteristicUUIDs.pressure:
+                case CHAR_UUIDS.PRESSURE:
                     document.getElementById('pressure').textContent = `${value.getUint32(0, true) / 100} hPa`;
                     break;
-                case characteristicUUIDs.humidity:
+                case CHAR_UUIDS.HUMIDITY:
                     document.getElementById('humidity').textContent = `${value.getUint16(0, true) / 100} %`;
                     break;
-                case characteristicUUIDs.gas:
+                case CHAR_UUIDS.GAS:
                     document.getElementById('gas').textContent = `${value.getUint32(0, true)} Ohms`;
                     break;
-                case characteristicUUIDs.light:
+                case CHAR_UUIDS.LIGHT:
                     document.getElementById('light').textContent = `${value.getUint16(0, true)} lux`;
                     break;
-                case characteristicUUIDs.accel:
+                case CHAR_UUIDS.ACCEL:
                     document.getElementById('accelX').textContent = value.getInt16(0, true);
                     document.getElementById('accelY').textContent = value.getInt16(2, true);
                     document.getElementById('accelZ').textContent = value.getInt16(4, true);
                     break;
-                case characteristicUUIDs.gyro:
+                case CHAR_UUIDS.GYRO:
                     document.getElementById('gyroX').textContent = value.getInt16(0, true);
                     document.getElementById('gyroY').textContent = value.getInt16(2, true);
                     document.getElementById('gyroZ').textContent = value.getInt16(4, true);
