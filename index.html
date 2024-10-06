@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 BME680 BLE Sensor</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        #sensorData { font-size: 1.2em; margin: 20px 0; }
+        button { font-size: 1em; padding: 10px 20px; }
+    </style>
+</head>
+<body>
+    <h1>ESP32 BME680 BLE Sensor</h1>
+    <button id="connectButton">Connect to ESP32</button>
+    <div id="sensorData">
+        <p>Temperature: -- °C</p>
+        <p>Pressure: -- hPa</p>
+        <p>Humidity: -- %</p>
+        <p>Gas: -- Ohms</p>
+    </div>
+
+    <script>
+        const SERVICE_UUID = "181a";
+        const CHAR_TEMP_UUID = "2a6e";
+        const CHAR_PRESSURE_UUID = "2a6d";
+        const CHAR_HUMIDITY_UUID = "2a6f";
+        const CHAR_GAS_UUID = "2a70";
+        let device;
+
+        document.getElementById('connectButton').addEventListener('click', connectToDevice);
+
+        async function connectToDevice() {
+            try {
+                console.log("Requesting Bluetooth Device...");
+                device = await navigator.bluetooth.requestDevice({
+                    filters: [{ services: [SERVICE_UUID] }]
+                });
+
+                console.log("Connecting to GATT Server...");
+                const server = await device.gatt.connect();
+
+                console.log("Getting Environmental Sensing Service...");
+                const service = await server.getPrimaryService(SERVICE_UUID);
+
+                console.log("Getting Characteristics...");
+                const tempChar = await service.getCharacteristic(CHAR_TEMP_UUID);
+                const pressureChar = await service.getCharacteristic(CHAR_PRESSURE_UUID);
+                const humidityChar = await service.getCharacteristic(CHAR_HUMIDITY_UUID);
+                const gasChar = await service.getCharacteristic(CHAR_GAS_UUID);
+
+                tempChar.addEventListener('characteristicvaluechanged', handleTempChange);
+                pressureChar.addEventListener('characteristicvaluechanged', handlePressureChange);
+                humidityChar.addEventListener('characteristicvaluechanged', handleHumidityChange);
+                gasChar.addEventListener('characteristicvaluechanged', handleGasChange);
+
+                console.log("Starting notifications...");
+                await tempChar.startNotifications();
+                await pressureChar.startNotifications();
+                await humidityChar.startNotifications();
+                await gasChar.startNotifications();
+
+                console.log('Connected to ESP32');
+                document.getElementById('connectButton').textContent = 'Connected';
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        function handleTempChange(event) {
+            const temp = event.target.value.getUint16(0, true) / 100;
+            updateSensorData('Temperature', `${temp.toFixed(2)} °C`);
+        }
+
+        function handlePressureChange(event) {
+            const pressure = event.target.value.getUint32(0, true) / 100;
+            updateSensorData('Pressure', `${pressure.toFixed(2)} hPa`);
+        }
+
+        function handleHumidityChange(event) {
+            const humidity = event.target.value.getUint16(0, true) / 100;
+            updateSensorData('Humidity', `${humidity.toFixed(2)} %`);
+        }
+
+        function handleGasChange(event) {
+            const gas = event.target.value.getUint32(0, true);
+            updateSensorData('Gas', `${gas} Ohms`);
+        }
+
+        function updateSensorData(sensorType, value) {
+            const sensorDataDiv = document.getElementById('sensorData');
+            const paragraphs = sensorDataDiv.getElementsByTagName('p');
+            for (let p of paragraphs) {
+                if (p.textContent.startsWith(sensorType)) {
+                    p.textContent = `${sensorType}: ${value}`;
+                    break;
+                }
+            }
+        }
+    </script>
+</body>
+</html>
