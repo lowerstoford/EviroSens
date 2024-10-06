@@ -32,13 +32,18 @@
 
         async function connectToDevice() {
             try {
+                console.log("Requesting Bluetooth Device...");
                 device = await navigator.bluetooth.requestDevice({
                     filters: [{ services: [SERVICE_UUID] }]
                 });
 
+                console.log("Connecting to GATT Server...");
                 const server = await device.gatt.connect();
+
+                console.log("Getting Environmental Sensing Service...");
                 const service = await server.getPrimaryService(SERVICE_UUID);
 
+                console.log("Getting Characteristics...");
                 const tempChar = await service.getCharacteristic(CHAR_TEMP_UUID);
                 const pressureChar = await service.getCharacteristic(CHAR_PRESSURE_UUID);
                 const humidityChar = await service.getCharacteristic(CHAR_HUMIDITY_UUID);
@@ -49,6 +54,7 @@
                 humidityChar.addEventListener('characteristicvaluechanged', handleHumidityChange);
                 gasChar.addEventListener('characteristicvaluechanged', handleGasChange);
 
+                console.log("Starting notifications...");
                 await tempChar.startNotifications();
                 await pressureChar.startNotifications();
                 await humidityChar.startNotifications();
@@ -63,36 +69,33 @@
 
         function handleTempChange(event) {
             const temp = event.target.value.getUint16(0, true) / 100;
-            document.getElementById('sensorData').innerHTML = `
-                <p>Temperature: ${temp.toFixed(2)} °C</p>
-                ${document.getElementById('sensorData').innerHTML.split('</p>').slice(1).join('</p>')}
-            `;
+            updateSensorData('Temperature', `${temp.toFixed(2)} °C`);
         }
 
         function handlePressureChange(event) {
             const pressure = event.target.value.getUint32(0, true) / 100;
-            document.getElementById('sensorData').innerHTML = `
-                ${document.getElementById('sensorData').innerHTML.split('</p>')[0]}</p>
-                <p>Pressure: ${pressure.toFixed(2)} hPa</p>
-                ${document.getElementById('sensorData').innerHTML.split('</p>').slice(2).join('</p>')}
-            `;
+            updateSensorData('Pressure', `${pressure.toFixed(2)} hPa`);
         }
 
         function handleHumidityChange(event) {
             const humidity = event.target.value.getUint16(0, true) / 100;
-            document.getElementById('sensorData').innerHTML = `
-                ${document.getElementById('sensorData').innerHTML.split('</p>').slice(0, 2).join('</p>')}
-                <p>Humidity: ${humidity.toFixed(2)} %</p>
-                ${document.getElementById('sensorData').innerHTML.split('</p>').slice(3).join('</p>')}
-            `;
+            updateSensorData('Humidity', `${humidity.toFixed(2)} %`);
         }
 
         function handleGasChange(event) {
             const gas = event.target.value.getUint32(0, true);
-            document.getElementById('sensorData').innerHTML = `
-                ${document.getElementById('sensorData').innerHTML.split('</p>').slice(0, 3).join('</p>')}
-                <p>Gas: ${gas} Ohms</p>
-            `;
+            updateSensorData('Gas', `${gas} Ohms`);
+        }
+
+        function updateSensorData(sensorType, value) {
+            const sensorDataDiv = document.getElementById('sensorData');
+            const paragraphs = sensorDataDiv.getElementsByTagName('p');
+            for (let p of paragraphs) {
+                if (p.textContent.startsWith(sensorType)) {
+                    p.textContent = `${sensorType}: ${value}`;
+                    break;
+                }
+            }
         }
     </script>
 </body>
