@@ -1,7 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- ... (existing head content) ... -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Multi-Sensor BLE Device</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin: 0; padding: 20px; background-color: #f0f0f0; }
+        h1 { color: #333; }
+        #sensorData { font-size: 1.2em; margin: 20px 0; background-color: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        button { font-size: 1em; padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; transition: background-color 0.3s; }
+        button:hover { background-color: #45a049; }
+        p { margin: 10px 0; }
+    </style>
 </head>
 <body>
     <h1>ESP32 Multi-Sensor BLE Device</h1>
@@ -27,52 +37,22 @@
         const CHAR_GYRO_UUID = "2a76";
         let device;
 
-        // ... (existing connectToDevice function) ...
+        document.getElementById('connectButton').addEventListener('click', connectToDevice);
 
         async function connectToDevice() {
             try {
-                // ... (existing connection code) ...
+                console.log("Requesting Bluetooth Device...");
+                device = await navigator.bluetooth.requestDevice({
+                    filters: [{ services: [SERVICE_UUID] }]
+                });
 
-                const lightChar = await service.getCharacteristic(CHAR_LIGHT_UUID);
-                const accelChar = await service.getCharacteristic(CHAR_ACCEL_UUID);
-                const gyroChar = await service.getCharacteristic(CHAR_GYRO_UUID);
+                console.log("Connecting to GATT Server...");
+                const server = await device.gatt.connect();
 
-                lightChar.addEventListener('characteristicvaluechanged', handleLightChange);
-                accelChar.addEventListener('characteristicvaluechanged', handleAccelChange);
-                gyroChar.addEventListener('characteristicvaluechanged', handleGyroChange);
+                console.log("Getting Environmental Sensing Service...");
+                const service = await server.getPrimaryService(SERVICE_UUID);
 
-                await lightChar.startNotifications();
-                await accelChar.startNotifications();
-                await gyroChar.startNotifications();
-
-                // ... (rest of the connection code) ...
-            } catch (error) {
-                console.error('Error:', error);
-            }
-        }
-
-        // ... (existing handler functions) ...
-
-        function handleLightChange(event) {
-            const lux = event.target.value.getUint16(0, true);
-            updateSensorData('Light', `${lux.toFixed(2)} lux`);
-        }
-
-        function handleAccelChange(event) {
-            const x = event.target.value.getFloat32(0, true);
-            const y = event.target.value.getFloat32(4, true);
-            const z = event.target.value.getFloat32(8, true);
-            updateSensorData('Acceleration', `X: ${x.toFixed(2)}, Y: ${y.toFixed(2)}, Z: ${z.toFixed(2)} m/s²`);
-        }
-
-        function handleGyroChange(event) {
-            const x = event.target.value.getFloat32(0, true);
-            const y = event.target.value.getFloat32(4, true);
-            const z = event.target.value.getFloat32(8, true);
-            updateSensorData('Gyroscope', `X: ${x.toFixed(2)}, Y: ${y.toFixed(2)}, Z: ${z.toFixed(2)} deg/s`);
-        }
-
-        // ... (existing updateSensorData function) ...
-    </script>
-</body>
-</html>
+                console.log("Getting Characteristics...");
+                const tempChar = await service.getCharacteristic(CHAR_TEMP_UUID);
+                const pressureChar = await service.getCharacteristic(CHAR_PRESSURE_UUID);
+                const humidityChar = await service.get
