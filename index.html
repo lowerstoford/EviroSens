@@ -5,141 +5,122 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ESP32 Environmental Sensor</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; }
-        #sensorData { font-size: 1.2em; margin: 20px 0; }
-        button { font-size: 1em; padding: 10px 20px; margin-top: 20px; }
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        button {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .sensor-data {
+            background-color: #f2f2f2;
+            border-radius: 5px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .sensor-data p {
+            margin: 10px 0;
+        }
     </style>
 </head>
 <body>
     <h1>ESP32 Environmental Sensor</h1>
-    <button id="connectButton">Connect to ESP32</button>
-    <div id="sensorData">
-        <p>Temperature: -- °C</p>
-        <p>Pressure: -- hPa</p>
-        <p>Humidity: -- %</p>
-        <p>Gas: -- Ohms</p>
-        <p>Light: -- lux</p>
-        <p>Acceleration: X: -- Y: -- Z: --</p>
-        <p>Gyroscope: X: -- Y: -- Z: --</p>
+    <button id="connectBtn">Connect to ESP32</button>
+    <div class="sensor-data">
+        <p>Temperature: <span id="temperature">-- °C</span></p>
+        <p>Pressure: <span id="pressure">-- hPa</span></p>
+        <p>Humidity: <span id="humidity">-- %</span></p>
+        <p>Gas: <span id="gas">-- Ohms</span></p>
+        <p>Light: <span id="light">-- lux</span></p>
+        <p>Acceleration: X: <span id="accelX">--</span> Y: <span id="accelY">--</span> Z: <span id="accelZ">--</span></p>
+        <p>Gyroscope: X: <span id="gyroX">--</span> Y: <span id="gyroY">--</span> Z: <span id="gyroZ">--</span></p>
     </div>
 
     <script>
-        const SERVICE_UUID = "181a";  // Environmental Sensing Service UUID
-        const CHAR_TEMP_UUID = "2a6e";
-        const CHAR_PRESSURE_UUID = "2a6d";
-        const CHAR_HUMIDITY_UUID = "2a6f";
-        const CHAR_GAS_UUID = "2a70";
-        const CHAR_LIGHT_UUID = "2a77";
-        const CHAR_ACCEL_UUID = "2a5a";
-        const CHAR_GYRO_UUID = "2a5b";
+        let device, server, service;
+        const serviceUUID = '0x181a';
+        const characteristicUUIDs = {
+            temperature: '0x2a6e',
+            pressure: '0x2a6d',
+            humidity: '0x2a6f',
+            gas: '0x2a70',
+            light: '0x2a77',
+            accel: '0x2a5a',
+            gyro: '0x2a5b'
+        };
 
-        let device;
-
-        document.getElementById('connectButton').addEventListener('click', async () => {
+        async function connectToBLE() {
             try {
-                console.log("Requesting Bluetooth Device...");
                 device = await navigator.bluetooth.requestDevice({
-                    filters: [{ services: [SERVICE_UUID] }]
+                    filters: [{ services: [serviceUUID] }]
                 });
-
-                console.log("Connecting to GATT Server...");
-                const server = await device.gatt.connect();
-
-                console.log("Getting Environmental Sensing Service...");
-                const service = await server.getPrimaryService(SERVICE_UUID);
-
-                // Get characteristics
-                const tempChar = await service.getCharacteristic(CHAR_TEMP_UUID);
-                const pressureChar = await service.getCharacteristic(CHAR_PRESSURE_UUID);
-                const humidityChar = await service.getCharacteristic(CHAR_HUMIDITY_UUID);
-                const gasChar = await service.getCharacteristic(CHAR_GAS_UUID);
-                const lightChar = await service.getCharacteristic(CHAR_LIGHT_UUID);
-                const accelChar = await service.getCharacteristic(CHAR_ACCEL_UUID);
-                const gyroChar = await service.getCharacteristic(CHAR_GYRO_UUID);
-
-                // Add event listeners for characteristic value changes
-                tempChar.addEventListener('characteristicvaluechanged', handleTempChange);
-                pressureChar.addEventListener('characteristicvaluechanged', handlePressureChange);
-                humidityChar.addEventListener('characteristicvaluechanged', handleHumidityChange);
-                gasChar.addEventListener('characteristicvaluechanged', handleGasChange);
-                lightChar.addEventListener('characteristicvaluechanged', handleLightChange);
-                accelChar.addEventListener('characteristicvaluechanged', handleAccelChange);
-                gyroChar.addEventListener('characteristicvaluechanged', handleGyroChange);
-
-                // Start notifications for all characteristics
-                await tempChar.startNotifications();
-                await pressureChar.startNotifications();
-                await humidityChar.startNotifications();
-                await gasChar.startNotifications();
-                await lightChar.startNotifications();
-                await accelChar.startNotifications();
-                await gyroChar.startNotifications();
-
-                console.log('Connected and notifications started');
-                document.getElementById('connectButton').textContent = 'Connected';
-            } catch (error) {
-                console.error('Connection failed:', error);
-            }
-        });
-
-        // Handle characteristic changes and update UI
-        function handleTempChange(event) {
-            const value = new DataView(event.target.value.buffer);
-            const temp = value.getUint16(0, true) / 100; // Correct byte order and scaling
-            updateSensorData('Temperature', `${temp.toFixed(2)} °C`);
-        }
-
-        function handlePressureChange(event) {
-            const value = new DataView(event.target.value.buffer);
-            const pressure = value.getUint32(0, true) / 100; // Correct byte order and scaling
-            updateSensorData('Pressure', `${pressure.toFixed(2)} hPa`);
-        }
-
-        function handleHumidityChange(event) {
-            const value = new DataView(event.target.value.buffer);
-            const humidity = value.getUint16(0, true) / 100; // Correct byte order and scaling
-            updateSensorData('Humidity', `${humidity.toFixed(2)} %`);
-        }
-
-        function handleGasChange(event) {
-            const value = new DataView(event.target.value.buffer);
-            const gas = value.getUint32(0, true); // Correct byte order
-            updateSensorData('Gas', `${gas} Ohms`);
-        }
-
-        function handleLightChange(event) {
-            const value = new DataView(event.target.value.buffer);
-            const light = value.getUint16(0, true); // Correct byte order
-            updateSensorData('Light', `${light} lux`);
-        }
-
-        function handleAccelChange(event) {
-            const value = new DataView(event.target.value.buffer);
-            const accelX = value.getInt16(0, true);
-            const accelY = value.getInt16(2, true);
-            const accelZ = value.getInt16(4, true);
-            updateSensorData('Acceleration', `X: ${accelX}, Y: ${accelY}, Z: ${accelZ}`);
-        }
-
-        function handleGyroChange(event) {
-            const value = new DataView(event.target.value.buffer);
-            const gyroX = value.getInt16(0, true);
-            const gyroY = value.getInt16(2, true);
-            const gyroZ = value.getInt16(4, true);
-            updateSensorData('Gyroscope', `X: ${gyroX}, Y: ${gyroY}, Z: ${gyroZ}`);
-        }
-
-        // Update the sensor data in the UI
-        function updateSensorData(sensorType, value) {
-            const sensorDataDiv = document.getElementById('sensorData');
-            const paragraphs = sensorDataDiv.getElementsByTagName('p');
-            for (let p of paragraphs) {
-                if (p.textContent.startsWith(sensorType)) {
-                    p.textContent = `${sensorType}: ${value}`;
-                    break;
+                server = await device.gatt.connect();
+                service = await server.getPrimaryService(serviceUUID);
+                
+                for (let [key, uuid] of Object.entries(characteristicUUIDs)) {
+                    const characteristic = await service.getCharacteristic(uuid);
+                    characteristic.addEventListener('characteristicvaluechanged', handleCharacteristicValueChanged);
+                    await characteristic.startNotifications();
                 }
+                
+                console.log('Connected to ESP32');
+                document.getElementById('connectBtn').textContent = 'Connected';
+            } catch (error) {
+                console.error('Error:', error);
             }
         }
+
+        function handleCharacteristicValueChanged(event) {
+            const value = event.target.value;
+            const uuid = event.target.uuid;
+
+            switch (uuid) {
+                case characteristicUUIDs.temperature:
+                    document.getElementById('temperature').textContent = `${value.getUint16(0, true) / 100} °C`;
+                    break;
+                case characteristicUUIDs.pressure:
+                    document.getElementById('pressure').textContent = `${value.getUint32(0, true) / 100} hPa`;
+                    break;
+                case characteristicUUIDs.humidity:
+                    document.getElementById('humidity').textContent = `${value.getUint16(0, true) / 100} %`;
+                    break;
+                case characteristicUUIDs.gas:
+                    document.getElementById('gas').textContent = `${value.getUint32(0, true)} Ohms`;
+                    break;
+                case characteristicUUIDs.light:
+                    document.getElementById('light').textContent = `${value.getUint16(0, true)} lux`;
+                    break;
+                case characteristicUUIDs.accel:
+                    document.getElementById('accelX').textContent = value.getInt16(0, true);
+                    document.getElementById('accelY').textContent = value.getInt16(2, true);
+                    document.getElementById('accelZ').textContent = value.getInt16(4, true);
+                    break;
+                case characteristicUUIDs.gyro:
+                    document.getElementById('gyroX').textContent = value.getInt16(0, true);
+                    document.getElementById('gyroY').textContent = value.getInt16(2, true);
+                    document.getElementById('gyroZ').textContent = value.getInt16(4, true);
+                    break;
+            }
+        }
+
+        document.getElementById('connectBtn').addEventListener('click', connectToBLE);
     </script>
 </body>
 </html>
