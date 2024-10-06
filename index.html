@@ -38,18 +38,18 @@
 
         async function connectToDevice() {
             try {
-                console.log("Requesting Bluetooth Device...");
+                // Request the Bluetooth device
                 device = await navigator.bluetooth.requestDevice({
                     filters: [{ services: [SERVICE_UUID] }]
                 });
 
-                console.log("Connecting to GATT Server...");
+                // Connect to GATT Server
                 const server = await device.gatt.connect();
 
-                console.log("Getting Environmental Sensing Service...");
+                // Get Environmental Sensing Service
                 const service = await server.getPrimaryService(SERVICE_UUID);
 
-                console.log("Getting Characteristics...");
+                // Get Characteristics
                 const tempChar = await service.getCharacteristic(CHAR_TEMP_UUID);
                 const pressureChar = await service.getCharacteristic(CHAR_PRESSURE_UUID);
                 const humidityChar = await service.getCharacteristic(CHAR_HUMIDITY_UUID);
@@ -58,6 +58,7 @@
                 const accelChar = await service.getCharacteristic(CHAR_ACCEL_UUID);
                 const gyroChar = await service.getCharacteristic(CHAR_GYRO_UUID);
 
+                // Add event listeners for notifications
                 tempChar.addEventListener('characteristicvaluechanged', handleTempChange);
                 pressureChar.addEventListener('characteristicvaluechanged', handlePressureChange);
                 humidityChar.addEventListener('characteristicvaluechanged', handleHumidityChange);
@@ -66,7 +67,7 @@
                 accelChar.addEventListener('characteristicvaluechanged', handleAccelChange);
                 gyroChar.addEventListener('characteristicvaluechanged', handleGyroChange);
 
-                console.log("Starting notifications...");
+                // Start notifications
                 await tempChar.startNotifications();
                 await pressureChar.startNotifications();
                 await humidityChar.startNotifications();
@@ -75,13 +76,14 @@
                 await accelChar.startNotifications();
                 await gyroChar.startNotifications();
 
-                console.log('Connected to ESP32');
+                // Update UI
                 document.getElementById('connectButton').textContent = 'Connected';
             } catch (error) {
                 console.error('Error:', error);
             }
         }
 
+        // Handle characteristic value changes
         function handleTempChange(event) {
             const temp = event.target.value.getUint16(0, true) / 100;
             updateSensorData('Temperature', `${temp.toFixed(2)} °C`);
@@ -121,6 +123,7 @@
             updateSensorData('Gyroscope', `X: ${gyroX}, Y: ${gyroY}, Z: ${gyroZ}`);
         }
 
+        // Update the UI with new sensor data
         function updateSensorData(sensorType, value) {
             const sensorDataDiv = document.getElementById('sensorData');
             const paragraphs = sensorDataDiv.getElementsByTagName('p');
