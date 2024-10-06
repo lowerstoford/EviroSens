@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 BME680 Sensor Interface</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        button { font-size: 16px; padding: 10px 20px; }
+        #sensorData { margin-top: 20px; border: 1px solid #ddd; padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>ESP32 BME680 Sensor Interface</h1>
+    <button id="connectBtn">Connect to Device</button>
+    <div id="sensorData">
+        <h2>Sensor Data:</h2>
+        <p id="temperature">Temperature: --</p>
+        <p id="humidity">Humidity: --</p>
+        <p id="pressure">Pressure: --</p>
+        <p id="gas">Gas: --</p>
+    </div>
+
+    <script>
+        const serviceUUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+        const characteristicUUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+        let device, characteristic;
+
+        document.getElementById('connectBtn').addEventListener('click', connectToDevice);
+
+        async function connectToDevice() {
+            try {
+                device = await navigator.bluetooth.requestDevice({
+                    filters: [{ services: [serviceUUID] }]
+                });
+
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService(serviceUUID);
+                characteristic = await service.getCharacteristic(characteristicUUID);
+
+                await characteristic.startNotifications();
+                characteristic.addEventListener('characteristicvaluechanged', handleCharacteristicValueChanged);
+
+                console.log('Connected to device');
+                document.getElementById('connectBtn').textContent = 'Connected';
+            } catch (error) {
+                console.error('Connection failed:', error);
+            }
+        }
+
+        function handleCharacteristicValueChanged(event) {
+            const value = new TextDecoder().decode(event.target.value);
+            console.log('Received:', value);
+            updateSensorData(value);
+        }
+
+        function updateSensorData(data) {
+            const parts = data.split(',');
+            parts.forEach(part => {
+                const [key, value] = part.split(':');
+                switch (key) {
+                    case 'Temp':
+                        document.getElementById('temperature').textContent = `Temperature: ${value} °C`;
+                        break;
+                    case 'Hum':
+                        document.getElementById('humidity').textContent = `Humidity: ${value} %`;
+                        break;
+                    case 'Pres':
+                        document.getElementById('pressure').textContent = `Pressure: ${value} hPa`;
+                        break;
+                    case 'Gas':
+                        document.getElementById('gas').textContent = `Gas: ${value} KOhms`;
+                        break;
+                }
+            });
+        }
+    </script>
+</body>
+</html>
