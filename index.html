@@ -3,130 +3,100 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32 Environmental Sensor</title>
+    <title>ESP32 BME680 BLE Sensor</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            line-height: 1.6;
-        }
-        h1 {
-            text-align: center;
-            color: #333;
-        }
-        button {
-            display: block;
-            margin: 20px auto;
-            padding: 10px 20px;
-            font-size: 16px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-        .sensor-data {
-            background-color: #f2f2f2;
-            border-radius: 5px;
-            padding: 20px;
-            margin-top: 20px;
-        }
-        .sensor-data p {
-            margin: 10px 0;
-        }
+        body { font-family: Arial, sans-serif; text-align: center; }
+        #sensorData { font-size: 1.2em; margin: 20px 0; }
+        button { font-size: 1em; padding: 10px 20px; }
     </style>
 </head>
 <body>
-    <h1>ESP32 Environmental Sensor</h1>
-    <button id="connectBtn">Connect to ESP32</button>
-    <div class="sensor-data">
-        <p>Temperature: <span id="temperature">-- °C</span></p>
-        <p>Pressure: <span id="pressure">-- hPa</span></p>
-        <p>Humidity: <span id="humidity">-- %</span></p>
-        <p>Gas: <span id="gas">-- Ohms</span></p>
-        <p>Light: <span id="light">-- lux</span></p>
-        <p>Acceleration: X: <span id="accelX">--</span> Y: <span id="accelY">--</span> Z: <span id="accelZ">--</span></p>
-        <p>Gyroscope: X: <span id="gyroX">--</span> Y: <span id="gyroY">--</span> Z: <span id="gyroZ">--</span></p>
+    <h1>ESP32 BME680 BLE Sensor</h1>
+    <button id="connectButton">Connect to ESP32</button>
+    <div id="sensorData">
+        <p>Temperature: -- °C</p>
+        <p>Pressure: -- hPa</p>
+        <p>Humidity: -- %</p>
+        <p>Gas: -- Ohms</p>
     </div>
 
     <script>
-        const SERVICE_UUID = '181a';
-        const CHAR_UUIDS = {
-            TEMP: '2a6e',
-            PRESSURE: '2a6d',
-            HUMIDITY: '2a6f',
-            GAS: '2a70',
-            LIGHT: '2a77',
-            ACCEL: '2a5a',
-            GYRO: '2a5b'
-        };
+        const SERVICE_UUID = "181a";
+        const CHAR_TEMP_UUID = "2a6e";
+        const CHAR_PRESSURE_UUID = "2a6d";
+        const CHAR_HUMIDITY_UUID = "2a6f";
+        const CHAR_GAS_UUID = "2a70";
+        let device;
 
-        let device, server, service;
+        document.getElementById('connectButton').addEventListener('click', connectToDevice);
 
-        async function connectToBLE() {
+        async function connectToDevice() {
             try {
-                console.log('Requesting Bluetooth Device...');
+                console.log("Requesting Bluetooth Device...");
                 device = await navigator.bluetooth.requestDevice({
                     filters: [{ services: [SERVICE_UUID] }]
                 });
 
-                console.log('Connecting to GATT Server...');
-                server = await device.gatt.connect();
+                console.log("Connecting to GATT Server...");
+                const server = await device.gatt.connect();
 
-                console.log('Getting Environmental Sensing Service...');
-                service = await server.getPrimaryService(SERVICE_UUID);
+                console.log("Getting Environmental Sensing Service...");
+                const service = await server.getPrimaryService(SERVICE_UUID);
 
-                for (const [key, uuid] of Object.entries(CHAR_UUIDS)) {
-                    const characteristic = await service.getCharacteristic(uuid);
-                    await characteristic.startNotifications();
-                    characteristic.addEventListener('characteristicvaluechanged', handleCharacteristicValueChanged);
-                }
+                console.log("Getting Characteristics...");
+                const tempChar = await service.getCharacteristic(CHAR_TEMP_UUID);
+                const pressureChar = await service.getCharacteristic(CHAR_PRESSURE_UUID);
+                const humidityChar = await service.getCharacteristic(CHAR_HUMIDITY_UUID);
+                const gasChar = await service.getCharacteristic(CHAR_GAS_UUID);
+
+                tempChar.addEventListener('characteristicvaluechanged', handleTempChange);
+                pressureChar.addEventListener('characteristicvaluechanged', handlePressureChange);
+                humidityChar.addEventListener('characteristicvaluechanged', handleHumidityChange);
+                gasChar.addEventListener('characteristicvaluechanged', handleGasChange);
+
+                console.log("Starting notifications...");
+                await tempChar.startNotifications();
+                await pressureChar.startNotifications();
+                await humidityChar.startNotifications();
+                await gasChar.startNotifications();
 
                 console.log('Connected to ESP32');
-                document.getElementById('connectBtn').textContent = 'Connected';
+                document.getElementById('connectButton').textContent = 'Connected';
             } catch (error) {
                 console.error('Error:', error);
             }
         }
 
-        function handleCharacteristicValueChanged(event) {
-            const value = event.target.value;
-            const uuid = event.target.uuid;
-
-            switch (uuid) {
-                case CHAR_UUIDS.TEMP:
-                    document.getElementById('temperature').textContent = `${value.getUint16(0, true) / 100} °C`;
-                    break;
-                case CHAR_UUIDS.PRESSURE:
-                    document.getElementById('pressure').textContent = `${value.getUint32(0, true) / 100} hPa`;
-                    break;
-                case CHAR_UUIDS.HUMIDITY:
-                    document.getElementById('humidity').textContent = `${value.getUint16(0, true) / 100} %`;
-                    break;
-                case CHAR_UUIDS.GAS:
-                    document.getElementById('gas').textContent = `${value.getUint32(0, true)} Ohms`;
-                    break;
-                case CHAR_UUIDS.LIGHT:
-                    document.getElementById('light').textContent = `${value.getUint16(0, true)} lux`;
-                    break;
-                case CHAR_UUIDS.ACCEL:
-                    document.getElementById('accelX').textContent = value.getInt16(0, true);
-                    document.getElementById('accelY').textContent = value.getInt16(2, true);
-                    document.getElementById('accelZ').textContent = value.getInt16(4, true);
-                    break;
-                case CHAR_UUIDS.GYRO:
-                    document.getElementById('gyroX').textContent = value.getInt16(0, true);
-                    document.getElementById('gyroY').textContent = value.getInt16(2, true);
-                    document.getElementById('gyroZ').textContent = value.getInt16(4, true);
-                    break;
-            }
+        function handleTempChange(event) {
+            const temp = event.target.value.getUint16(0, true) / 100;
+            updateSensorData('Temperature', `${temp.toFixed(2)} °C`);
         }
 
-        document.getElementById('connectBtn').addEventListener('click', connectToBLE);
+        function handlePressureChange(event) {
+            const pressure = event.target.value.getUint32(0, true) / 100;
+            updateSensorData('Pressure', `${pressure.toFixed(2)} hPa`);
+        }
+
+        function handleHumidityChange(event) {
+            const humidity = event.target.value.getUint16(0, true) / 100;
+            updateSensorData('Humidity', `${humidity.toFixed(2)} %`);
+        }
+
+        function handleGasChange(event) {
+            const gas = event.target.value.getUint32(0, true);
+            updateSensorData('Gas', `${gas} Ohms`);
+        }
+
+        function updateSensorData(sensorType, value) {
+            const sensorDataDiv = document.getElementById('sensorData');
+            const paragraphs = sensorDataDiv.getElementsByTagName('p');
+            for (let p of paragraphs) {
+                if (p.textContent.startsWith(sensorType)) {
+                    p.textContent = `${sensorType}: ${value}`;
+                    break;
+                }
+            }
+        }
     </script>
 </body>
 </html>
