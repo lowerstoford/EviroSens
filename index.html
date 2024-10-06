@@ -43,42 +43,58 @@
         </div>
     </div>
     <button id="connect">Connect to ESP32</button>
+    <div id="log"></div>
 
     <script>
         let device, server, service;
-        const serviceUUID = "181A";
+        const serviceUUID = "181a";
         const characteristicUUIDs = {
-            temperature: "2A6E",
-            humidity: "2A6F",
-            pressure: "2A6D",
-            gas: "2A73",
-            light: "2A77",
-            acceleration: "2A5A",
-            gyroscope: "2A5B"
+            temperature: "2a6e",
+            humidity: "2a6f",
+            pressure: "2a6d",
+            gas: "2a73",
+            light: "2a77",
+            acceleration: "2a5a",
+            gyroscope: "2a5b"
         };
+
+        function log(message) {
+            console.log(message);
+            document.getElementById('log').innerHTML += message + '<br>';
+        }
 
         document.getElementById('connect').addEventListener('click', connectToESP32);
 
         async function connectToESP32() {
             try {
+                log('Requesting Bluetooth Device...');
                 device = await navigator.bluetooth.requestDevice({
                     filters: [{ services: [serviceUUID] }]
                 });
+
+                log('Connecting to GATT Server...');
                 server = await device.gatt.connect();
+
+                log('Getting Environmental Sensing Service...');
                 service = await server.getPrimaryService(serviceUUID);
                 
                 for (let [key, uuid] of Object.entries(characteristicUUIDs)) {
+                    log(`Getting ${key} Characteristic...`);
                     const characteristic = await service.getCharacteristic(uuid);
                     characteristic.addEventListener('characteristicvaluechanged', event => {
                         const value = event.target.value;
-                        document.getElementById(key).textContent = parseFloat(new TextDecoder().decode(value)).toFixed(2);
+                        const decodedValue = new TextDecoder().decode(value);
+                        log(`Received ${key}: ${decodedValue}`);
+                        document.getElementById(key).textContent = parseFloat(decodedValue).toFixed(2);
                     });
                     await characteristic.startNotifications();
+                    log(`${key} notifications started.`);
                 }
                 
                 document.getElementById('connect').textContent = 'Connected';
+                log('Connected to ESP32 and receiving data.');
             } catch (error) {
-                console.error('Connection failed:', error);
+                log('Error: ' + error);
             }
         }
     </script>
