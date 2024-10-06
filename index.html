@@ -1,102 +1,37 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32 Sensor Pack</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        button { font-size: 16px; padding: 10px; }
-        #sensorData { margin-top: 20px; }
-        .sensor-value { margin-bottom: 10px; }
-    </style>
+  <title>BLE Sensor Data</title>
 </head>
 <body>
-    <h1>ESP32 Sensor Pack Data</h1>
-    <button id="connectButton">Connect to ESP32</button>
-    <div id="sensorData"></div>
+  <h1>Sensor Data</h1>
+  <div id="data">Connecting...</div>
 
-    <script>
-        const serviceUUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
-        const characteristicUUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
-        let device, characteristic;
+  <script>
+    let device;
+    let characteristic;
 
-        document.getElementById('connectButton').addEventListener('click', connectToDevice);
+    async function connect() {
+      try {
+        device = await navigator.bluetooth.requestDevice({
+          filters: [{ services: [0x181A] }]
+        });
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService(0x181A);
+        characteristic = await service.getCharacteristic(0x2A6E);
+        characteristic.startNotifications();
+        characteristic.addEventListener('characteristicvaluechanged', handleData);
+      } catch (error) {
+        console.log(error);
+      }
+    }
 
-        async function connectToDevice() {
-            try {
-                device = await navigator.bluetooth.requestDevice({
-                    filters: [{ services: [serviceUUID] }]
-                });
+    function handleData(event) {
+      const value = new TextDecoder().decode(event.target.value);
+      document.getElementById('data').innerText = value;
+    }
 
-                const server = await device.gatt.connect();
-                const service = await server.getPrimaryService(serviceUUID);
-                characteristic = await service.getCharacteristic(characteristicUUID);
-
-                await characteristic.startNotifications();
-                characteristic.addEventListener('characteristicvaluechanged', handleCharacteristicValueChanged);
-
-                console.log('Connected to ESP32');
-                document.getElementById('connectButton').textContent = 'Connected';
-            } catch (error) {
-                console.error('Connection failed:', error);
-            }
-        }
-
-        function handleCharacteristicValueChanged(event) {
-            const value = new TextDecoder().decode(event.target.value);
-            const sensorValues = parseSensorData(value);
-            updateSensorDisplay(sensorValues);
-        }
-
-        function parseSensorData(data) {
-            const values = {};
-            data.split(',').forEach(item => {
-                const [key, value] = item.split(':');
-                values[key] = parseFloat(value);
-            });
-            return values;
-        }
-
-        function updateSensorDisplay(values) {
-            const sensorDataDiv = document.getElementById('sensorData');
-            sensorDataDiv.innerHTML = '';
-
-            for (const [key, value] of Object.entries(values)) {
-                const sensorElement = document.createElement('div');
-                sensorElement.className = 'sensor-value';
-                sensorElement.textContent = `${getSensorName(key)}: ${value.toFixed(2)} ${getSensorUnit(key)}`;
-                sensorDataDiv.appendChild(sensorElement);
-            }
-        }
-
-        function getSensorName(key) {
-            const names = {
-                'T': 'Temperature',
-                'P': 'Pressure',
-                'H': 'Humidity',
-                'G': 'Gas',
-                'AX': 'Acceleration X',
-                'AY': 'Acceleration Y',
-                'AZ': 'Acceleration Z',
-                'L': 'Light'
-            };
-            return names[key] || key;
-        }
-
-        function getSensorUnit(key) {
-            const units = {
-                'T': '°C',
-                'P': 'hPa',
-                'H': '%',
-                'G': 'KOhms',
-                'AX': 'm/s²',
-                'AY': 'm/s²',
-                'AZ': 'm/s²',
-                'L': 'lx'
-            };
-            return units[key] || '';
-        }
-    </script>
+    connect();
+  </script>
 </body>
 </html>
