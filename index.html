@@ -3,76 +3,99 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32 BME680 and BH1750 BLE Sensor</title>
+    <title>ESP32 Sensor Pack</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        button { font-size: 16px; padding: 10px; }
+        #sensorData { margin-top: 20px; }
+        .sensor-value { margin-bottom: 10px; }
+    </style>
 </head>
 <body>
-    <h1>ESP32 BME680 and BH1750 BLE Sensor</h1>
-    <button onclick="connect()">Connect to ESP32</button>
-    <div id="sensorData">
-        <p>Temperature: <span id="temperature">-- °C</span></p>
-        <p>Pressure: <span id="pressure">-- hPa</span></p>
-        <p>Humidity: <span id="humidity">-- %</span></p>
-        <p>Gas: <span id="gas">-- Ohms</span></p>
-        <p>Light: <span id="light">-- lux</span></p>
-    </div>
+    <h1>ESP32 Sensor Pack Data</h1>
+    <button id="connectButton">Connect to ESP32</button>
+    <div id="sensorData"></div>
+
     <script>
-        const serviceUuid = '181a';
-        const tempCharacteristic = '2a6e';
-        const pressureCharacteristic = '2a6d';
-        const humidityCharacteristic = '2a6f';
-        const gasCharacteristic = '2a70';
-        const lightCharacteristic = '2a77';
+        const serviceUUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+        const characteristicUUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+        let device, characteristic;
 
-        let device, server, service;
+        document.getElementById('connectButton').addEventListener('click', connectToDevice);
 
-        async function connect() {
+        async function connectToDevice() {
             try {
                 device = await navigator.bluetooth.requestDevice({
-                    filters: [{ services: [serviceUuid] }]
+                    filters: [{ services: [serviceUUID] }]
                 });
-                server = await device.gatt.connect();
-                service = await server.getPrimaryService(serviceUuid);
-                
-                const characteristics = [
-                    tempCharacteristic,
-                    pressureCharacteristic,
-                    humidityCharacteristic,
-                    gasCharacteristic,
-                    lightCharacteristic
-                ];
 
-                for (const uuid of characteristics) {
-                    const characteristic = await service.getCharacteristic(uuid);
-                    await characteristic.startNotifications();
-                    characteristic.addEventListener('characteristicvaluechanged', handleCharacteristic);
-                }
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService(serviceUUID);
+                characteristic = await service.getCharacteristic(characteristicUUID);
+
+                await characteristic.startNotifications();
+                characteristic.addEventListener('characteristicvaluechanged', handleCharacteristicValueChanged);
 
                 console.log('Connected to ESP32');
+                document.getElementById('connectButton').textContent = 'Connected';
             } catch (error) {
                 console.error('Connection failed:', error);
             }
         }
 
-        function handleCharacteristic(event) {
-            const characteristic = event.target;
-            const value = characteristic.value;
+        function handleCharacteristicValueChanged(event) {
+            const value = new TextDecoder().decode(event.target.value);
+            const sensorValues = parseSensorData(value);
+            updateSensorDisplay(sensorValues);
+        }
 
-            if (characteristic.uuid === tempCharacteristic) {
-                const temp = value.getUint16(0, true) / 100;
-                document.getElementById('temperature').textContent = temp.toFixed(2) + ' °C';
-            } else if (characteristic.uuid === pressureCharacteristic) {
-                const pressure = value.getUint32(0, true) / 100;
-                document.getElementById('pressure').textContent = pressure.toFixed(2) + ' hPa';
-            } else if (characteristic.uuid === humidityCharacteristic) {
-                const humidity = value.getUint16(0, true) / 100;
-                document.getElementById('humidity').textContent = humidity.toFixed(2) + ' %';
-            } else if (characteristic.uuid === gasCharacteristic) {
-                const gas = value.getUint32(0, true);
-                document.getElementById('gas').textContent = gas + ' Ohms';
-            } else if (characteristic.uuid === lightCharacteristic) {
-                const light = value.getUint32(0, true) / 100;
-                document.getElementById('light').textContent = light.toFixed(2) + ' lux';
+        function parseSensorData(data) {
+            const values = {};
+            data.split(',').forEach(item => {
+                const [key, value] = item.split(':');
+                values[key] = parseFloat(value);
+            });
+            return values;
+        }
+
+        function updateSensorDisplay(values) {
+            const sensorDataDiv = document.getElementById('sensorData');
+            sensorDataDiv.innerHTML = '';
+
+            for (const [key, value] of Object.entries(values)) {
+                const sensorElement = document.createElement('div');
+                sensorElement.className = 'sensor-value';
+                sensorElement.textContent = `${getSensorName(key)}: ${value.toFixed(2)} ${getSensorUnit(key)}`;
+                sensorDataDiv.appendChild(sensorElement);
             }
+        }
+
+        function getSensorName(key) {
+            const names = {
+                'T': 'Temperature',
+                'P': 'Pressure',
+                'H': 'Humidity',
+                'G': 'Gas',
+                'AX': 'Acceleration X',
+                'AY': 'Acceleration Y',
+                'AZ': 'Acceleration Z',
+                'L': 'Light'
+            };
+            return names[key] || key;
+        }
+
+        function getSensorUnit(key) {
+            const units = {
+                'T': '°C',
+                'P': 'hPa',
+                'H': '%',
+                'G': 'KOhms',
+                'AX': 'm/s²',
+                'AY': 'm/s²',
+                'AZ': 'm/s²',
+                'L': 'lx'
+            };
+            return units[key] || '';
         }
     </script>
 </body>
