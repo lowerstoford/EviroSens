@@ -1,23 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32 BME680 BLE Sensor</title>
-    <style>
-        body { font-family: Arial, sans-serif; text-align: center; }
-        #sensorData { font-size: 1.2em; margin: 20px 0; }
-        button { font-size: 1em; padding: 10px 20px; }
-    </style>
+    <!-- ... (existing head content) ... -->
 </head>
 <body>
-    <h1>ESP32 BME680 BLE Sensor</h1>
+    <h1>ESP32 Multi-Sensor BLE Device</h1>
     <button id="connectButton">Connect to ESP32</button>
     <div id="sensorData">
         <p>Temperature: -- °C</p>
         <p>Pressure: -- hPa</p>
         <p>Humidity: -- %</p>
         <p>Gas: -- Ohms</p>
+        <p>Light: -- lux</p>
+        <p>Acceleration: X: -- , Y: -- , Z: -- m/s²</p>
+        <p>Gyroscope: X: -- , Y: -- , Z: -- deg/s</p>
     </div>
 
     <script>
@@ -26,77 +22,57 @@
         const CHAR_PRESSURE_UUID = "2a6d";
         const CHAR_HUMIDITY_UUID = "2a6f";
         const CHAR_GAS_UUID = "2a70";
+        const CHAR_LIGHT_UUID = "2a77";
+        const CHAR_ACCEL_UUID = "2713";
+        const CHAR_GYRO_UUID = "2a76";
         let device;
 
-        document.getElementById('connectButton').addEventListener('click', connectToDevice);
+        // ... (existing connectToDevice function) ...
 
         async function connectToDevice() {
             try {
-                console.log("Requesting Bluetooth Device...");
-                device = await navigator.bluetooth.requestDevice({
-                    filters: [{ services: [SERVICE_UUID] }]
-                });
+                // ... (existing connection code) ...
 
-                console.log("Connecting to GATT Server...");
-                const server = await device.gatt.connect();
+                const lightChar = await service.getCharacteristic(CHAR_LIGHT_UUID);
+                const accelChar = await service.getCharacteristic(CHAR_ACCEL_UUID);
+                const gyroChar = await service.getCharacteristic(CHAR_GYRO_UUID);
 
-                console.log("Getting Environmental Sensing Service...");
-                const service = await server.getPrimaryService(SERVICE_UUID);
+                lightChar.addEventListener('characteristicvaluechanged', handleLightChange);
+                accelChar.addEventListener('characteristicvaluechanged', handleAccelChange);
+                gyroChar.addEventListener('characteristicvaluechanged', handleGyroChange);
 
-                console.log("Getting Characteristics...");
-                const tempChar = await service.getCharacteristic(CHAR_TEMP_UUID);
-                const pressureChar = await service.getCharacteristic(CHAR_PRESSURE_UUID);
-                const humidityChar = await service.getCharacteristic(CHAR_HUMIDITY_UUID);
-                const gasChar = await service.getCharacteristic(CHAR_GAS_UUID);
+                await lightChar.startNotifications();
+                await accelChar.startNotifications();
+                await gyroChar.startNotifications();
 
-                tempChar.addEventListener('characteristicvaluechanged', handleTempChange);
-                pressureChar.addEventListener('characteristicvaluechanged', handlePressureChange);
-                humidityChar.addEventListener('characteristicvaluechanged', handleHumidityChange);
-                gasChar.addEventListener('characteristicvaluechanged', handleGasChange);
-
-                console.log("Starting notifications...");
-                await tempChar.startNotifications();
-                await pressureChar.startNotifications();
-                await humidityChar.startNotifications();
-                await gasChar.startNotifications();
-
-                console.log('Connected to ESP32');
-                document.getElementById('connectButton').textContent = 'Connected';
+                // ... (rest of the connection code) ...
             } catch (error) {
                 console.error('Error:', error);
             }
         }
 
-        function handleTempChange(event) {
-            const temp = event.target.value.getUint16(0, true) / 100;
-            updateSensorData('Temperature', `${temp.toFixed(2)} °C`);
+        // ... (existing handler functions) ...
+
+        function handleLightChange(event) {
+            const lux = event.target.value.getUint16(0, true);
+            updateSensorData('Light', `${lux.toFixed(2)} lux`);
         }
 
-        function handlePressureChange(event) {
-            const pressure = event.target.value.getUint32(0, true) / 100;
-            updateSensorData('Pressure', `${pressure.toFixed(2)} hPa`);
+        function handleAccelChange(event) {
+            const x = event.target.value.getFloat32(0, true);
+            const y = event.target.value.getFloat32(4, true);
+            const z = event.target.value.getFloat32(8, true);
+            updateSensorData('Acceleration', `X: ${x.toFixed(2)}, Y: ${y.toFixed(2)}, Z: ${z.toFixed(2)} m/s²`);
         }
 
-        function handleHumidityChange(event) {
-            const humidity = event.target.value.getUint16(0, true) / 100;
-            updateSensorData('Humidity', `${humidity.toFixed(2)} %`);
+        function handleGyroChange(event) {
+            const x = event.target.value.getFloat32(0, true);
+            const y = event.target.value.getFloat32(4, true);
+            const z = event.target.value.getFloat32(8, true);
+            updateSensorData('Gyroscope', `X: ${x.toFixed(2)}, Y: ${y.toFixed(2)}, Z: ${z.toFixed(2)} deg/s`);
         }
 
-        function handleGasChange(event) {
-            const gas = event.target.value.getUint32(0, true);
-            updateSensorData('Gas', `${gas} Ohms`);
-        }
-
-        function updateSensorData(sensorType, value) {
-            const sensorDataDiv = document.getElementById('sensorData');
-            const paragraphs = sensorDataDiv.getElementsByTagName('p');
-            for (let p of paragraphs) {
-                if (p.textContent.startsWith(sensorType)) {
-                    p.textContent = `${sensorType}: ${value}`;
-                    break;
-                }
-            }
-        }
+        // ... (existing updateSensorData function) ...
     </script>
 </body>
 </html>
