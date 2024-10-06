@@ -3,40 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32 Sensor Hub</title>
+    <title>ESP32 Environmental Sensor Dashboard</title>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; }
-        .sensor-data { margin: 20px; padding: 10px; border: 1px solid #ddd; }
+        .container { display: flex; flex-wrap: wrap; justify-content: center; }
+        .sensor { margin: 10px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
     </style>
 </head>
 <body>
-    <h1>ESP32 Sensor Hub</h1>
-    <button id="connectButton">Connect to ESP32</button>
-    
-    <div class="sensor-data">
-        <h2>BME680 Temperature</h2>
-        <p id="temperatureData">--</p>
+    <h1>ESP32 Environmental Sensor Dashboard</h1>
+    <div class="container">
+        <div class="sensor">
+            <h2>Temperature</h2>
+            <p id="temperature">--</p>
+        </div>
+        <div class="sensor">
+            <h2>Humidity</h2>
+            <p id="humidity">--</p>
+        </div>
+        <div class="sensor">
+            <h2>Pressure</h2>
+            <p id="pressure">--</p>
+        </div>
+        <div class="sensor">
+            <h2>Gas</h2>
+            <p id="gas">--</p>
+        </div>
+        <div class="sensor">
+            <h2>Light</h2>
+            <p id="light">--</p>
+        </div>
+        <div class="sensor">
+            <h2>Acceleration</h2>
+            <p id="acceleration">--</p>
+        </div>
+        <div class="sensor">
+            <h2>Gyroscope</h2>
+            <p id="gyroscope">--</p>
+        </div>
     </div>
-    
-    <div class="sensor-data">
-        <h2>BH1750 Light Level</h2>
-        <p id="lightData">--</p>
-    </div>
-    
-    <div class="sensor-data">
-        <h2>GY521 Orientation</h2>
-        <p id="orientationData">--</p>
-    </div>
+    <button id="connect">Connect to ESP32</button>
 
     <script>
-        const serviceUUID = '181a';
-        const bme680CharUUID = '2a6e';
-        const bh1750CharUUID = '2a77';
-        const gy521CharUUID = '2a6d';
-
         let device, server, service;
+        const serviceUUID = "181A";
+        const characteristicUUIDs = {
+            temperature: "2A6E",
+            humidity: "2A6F",
+            pressure: "2A6D",
+            gas: "2A73",
+            light: "2A77",
+            acceleration: "2A5A",
+            gyroscope: "2A5B"
+        };
 
-        async function connectBLE() {
+        document.getElementById('connect').addEventListener('click', connectToESP32);
+
+        async function connectToESP32() {
             try {
                 device = await navigator.bluetooth.requestDevice({
                     filters: [{ services: [serviceUUID] }]
@@ -44,42 +67,20 @@
                 server = await device.gatt.connect();
                 service = await server.getPrimaryService(serviceUUID);
                 
-                const bme680Char = await service.getCharacteristic(bme680CharUUID);
-                const bh1750Char = await service.getCharacteristic(bh1750CharUUID);
-                const gy521Char = await service.getCharacteristic(gy521CharUUID);
-
-                bme680Char.addEventListener('characteristicvaluechanged', handleBME680Data);
-                bh1750Char.addEventListener('characteristicvaluechanged', handleBH1750Data);
-                gy521Char.addEventListener('characteristicvaluechanged', handleGY521Data);
-
-                await bme680Char.startNotifications();
-                await bh1750Char.startNotifications();
-                await gy521Char.startNotifications();
-
-                console.log('Connected to ESP32');
+                for (let [key, uuid] of Object.entries(characteristicUUIDs)) {
+                    const characteristic = await service.getCharacteristic(uuid);
+                    characteristic.addEventListener('characteristicvaluechanged', event => {
+                        const value = event.target.value;
+                        document.getElementById(key).textContent = parseFloat(new TextDecoder().decode(value)).toFixed(2);
+                    });
+                    await characteristic.startNotifications();
+                }
+                
+                document.getElementById('connect').textContent = 'Connected';
             } catch (error) {
-                console.error('Error:', error);
+                console.error('Connection failed:', error);
             }
         }
-
-        function handleBME680Data(event) {
-            const temperature = event.target.value.getFloat32(0, true).toFixed(2);
-            document.getElementById('temperatureData').textContent = `${temperature}°C`;
-        }
-
-        function handleBH1750Data(event) {
-            const lux = event.target.value.getFloat32(0, true).toFixed(2);
-            document.getElementById('lightData').textContent = `${lux} lux`;
-        }
-
-        function handleGY521Data(event) {
-            const decoder = new TextDecoder('utf-8');
-            const data = decoder.decode(event.target.value);
-            const [ax, ay, az] = data.split(',');
-            document.getElementById('orientationData').textContent = `X: ${ax}, Y: ${ay}, Z: ${az}`;
-        }
-
-        document.getElementById('connectButton').addEventListener('click', connectBLE);
     </script>
 </body>
 </html>
