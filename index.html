@@ -6,120 +6,80 @@
     <title>ESP32 Sensor Hub</title>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; }
-        #sensorData { font-size: 1.2em; margin: 20px 0; text-align: left; max-width: 600px; margin: 0 auto; }
-        button { font-size: 1em; padding: 10px 20px; margin: 20px; }
+        .sensor-data { margin: 20px; padding: 10px; border: 1px solid #ddd; }
     </style>
 </head>
 <body>
     <h1>ESP32 Sensor Hub</h1>
     <button id="connectButton">Connect to ESP32</button>
-    <div id="sensorData">
-        <p>Temperature: -- °C</p>
-        <p>Pressure: -- hPa</p>
-        <p>Humidity: -- %</p>
-        <p>Gas: -- Ohms</p>
-        <p>Light: -- lux</p>
-        <p>Acceleration: X: -- , Y: -- , Z: -- m/s²</p>
+    
+    <div class="sensor-data">
+        <h2>BME680 Temperature</h2>
+        <p id="temperatureData">--</p>
+    </div>
+    
+    <div class="sensor-data">
+        <h2>BH1750 Light Level</h2>
+        <p id="lightData">--</p>
+    </div>
+    
+    <div class="sensor-data">
+        <h2>GY521 Orientation</h2>
+        <p id="orientationData">--</p>
     </div>
 
     <script>
-        const SERVICE_UUID = "181a";
-        const CHAR_TEMP_UUID = "2a6e";
-        const CHAR_PRESSURE_UUID = "2a6d";
-        const CHAR_HUMIDITY_UUID = "2a6f";
-        const CHAR_GAS_UUID = "2a70";
-        const CHAR_LIGHT_UUID = "2a77";
-        const CHAR_ACCEL_UUID = "2713";
-        let device;
+        const serviceUUID = '181a';
+        const bme680CharUUID = '2a6e';
+        const bh1750CharUUID = '2a77';
+        const gy521CharUUID = '2a6d';
 
-        document.getElementById('connectButton').addEventListener('click', connectToDevice);
+        let device, server, service;
 
-        async function connectToDevice() {
+        async function connectBLE() {
             try {
-                console.log("Requesting Bluetooth Device...");
                 device = await navigator.bluetooth.requestDevice({
-                    filters: [{ services: [SERVICE_UUID] }]
+                    filters: [{ services: [serviceUUID] }]
                 });
+                server = await device.gatt.connect();
+                service = await server.getPrimaryService(serviceUUID);
+                
+                const bme680Char = await service.getCharacteristic(bme680CharUUID);
+                const bh1750Char = await service.getCharacteristic(bh1750CharUUID);
+                const gy521Char = await service.getCharacteristic(gy521CharUUID);
 
-                console.log("Connecting to GATT Server...");
-                const server = await device.gatt.connect();
+                bme680Char.addEventListener('characteristicvaluechanged', handleBME680Data);
+                bh1750Char.addEventListener('characteristicvaluechanged', handleBH1750Data);
+                gy521Char.addEventListener('characteristicvaluechanged', handleGY521Data);
 
-                console.log("Getting Environmental Sensing Service...");
-                const service = await server.getPrimaryService(SERVICE_UUID);
-
-                console.log("Getting Characteristics...");
-                const tempChar = await service.getCharacteristic(CHAR_TEMP_UUID);
-                const pressureChar = await service.getCharacteristic(CHAR_PRESSURE_UUID);
-                const humidityChar = await service.getCharacteristic(CHAR_HUMIDITY_UUID);
-                const gasChar = await service.getCharacteristic(CHAR_GAS_UUID);
-                const lightChar = await service.getCharacteristic(CHAR_LIGHT_UUID);
-                const accelChar = await service.getCharacteristic(CHAR_ACCEL_UUID);
-
-                tempChar.addEventListener('characteristicvaluechanged', handleTempChange);
-                pressureChar.addEventListener('characteristicvaluechanged', handlePressureChange);
-                humidityChar.addEventListener('characteristicvaluechanged', handleHumidityChange);
-                gasChar.addEventListener('characteristicvaluechanged', handleGasChange);
-                lightChar.addEventListener('characteristicvaluechanged', handleLightChange);
-                accelChar.addEventListener('characteristicvaluechanged', handleAccelChange);
-
-                console.log("Starting notifications...");
-                await tempChar.startNotifications();
-                await pressureChar.startNotifications();
-                await humidityChar.startNotifications();
-                await gasChar.startNotifications();
-                await lightChar.startNotifications();
-                await accelChar.startNotifications();
+                await bme680Char.startNotifications();
+                await bh1750Char.startNotifications();
+                await gy521Char.startNotifications();
 
                 console.log('Connected to ESP32');
-                document.getElementById('connectButton').textContent = 'Connected';
             } catch (error) {
                 console.error('Error:', error);
             }
         }
 
-        function handleTempChange(event) {
-            const temp = event.target.value.getUint16(0, true) / 100;
-            updateSensorData('Temperature', `${temp.toFixed(2)} °C`);
+        function handleBME680Data(event) {
+            const temperature = event.target.value.getFloat32(0, true).toFixed(2);
+            document.getElementById('temperatureData').textContent = `${temperature}°C`;
         }
 
-        function handlePressureChange(event) {
-            const pressure = event.target.value.getUint32(0, true) / 100;
-            updateSensorData('Pressure', `${pressure.toFixed(2)} hPa`);
+        function handleBH1750Data(event) {
+            const lux = event.target.value.getFloat32(0, true).toFixed(2);
+            document.getElementById('lightData').textContent = `${lux} lux`;
         }
 
-        function handleHumidityChange(event) {
-            const humidity = event.target.value.getUint16(0, true) / 100;
-            updateSensorData('Humidity', `${humidity.toFixed(2)} %`);
+        function handleGY521Data(event) {
+            const decoder = new TextDecoder('utf-8');
+            const data = decoder.decode(event.target.value);
+            const [ax, ay, az] = data.split(',');
+            document.getElementById('orientationData').textContent = `X: ${ax}, Y: ${ay}, Z: ${az}`;
         }
 
-        function handleGasChange(event) {
-            const gas = event.target.value.getUint32(0, true);
-            updateSensorData('Gas', `${gas} Ohms`);
-        }
-
-        function handleLightChange(event) {
-            const light = event.target.value.getUint16(0, true) / 100;
-            updateSensorData('Light', `${light.toFixed(2)} lux`);
-        }
-
-        function handleAccelChange(event) {
-            const dataView = event.target.value;
-            const accX = dataView.getFloat32(0, true);
-            const accY = dataView.getFloat32(4, true);
-            const accZ = dataView.getFloat32(8, true);
-            updateSensorData('Acceleration', `X: ${accX.toFixed(2)}, Y: ${accY.toFixed(2)}, Z: ${accZ.toFixed(2)} m/s²`);
-        }
-
-        function updateSensorData(sensorType, value) {
-            const sensorDataDiv = document.getElementById('sensorData');
-            const paragraphs = sensorDataDiv.getElementsByTagName('p');
-            for (let p of paragraphs) {
-                if (p.textContent.startsWith(sensorType)) {
-                    p.textContent = `${sensorType}: ${value}`;
-                    break;
-                }
-            }
-        }
+        document.getElementById('connectButton').addEventListener('click', connectBLE);
     </script>
 </body>
 </html>
