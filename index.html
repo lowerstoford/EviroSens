@@ -84,41 +84,48 @@
 
         // Handle characteristic changes and update UI
         function handleTempChange(event) {
-            const temp = event.target.value.getUint16(0, true) / 100;
+            const value = new DataView(event.target.value.buffer);
+            const temp = value.getUint16(0, true) / 100; // Correct byte order and scaling
             updateSensorData('Temperature', `${temp.toFixed(2)} °C`);
         }
 
         function handlePressureChange(event) {
-            const pressure = event.target.value.getUint32(0, true) / 100;
+            const value = new DataView(event.target.value.buffer);
+            const pressure = value.getUint32(0, true) / 100; // Correct byte order and scaling
             updateSensorData('Pressure', `${pressure.toFixed(2)} hPa`);
         }
 
         function handleHumidityChange(event) {
-            const humidity = event.target.value.getUint16(0, true) / 100;
+            const value = new DataView(event.target.value.buffer);
+            const humidity = value.getUint16(0, true) / 100; // Correct byte order and scaling
             updateSensorData('Humidity', `${humidity.toFixed(2)} %`);
         }
 
         function handleGasChange(event) {
-            const gas = event.target.value.getUint32(0, true);
+            const value = new DataView(event.target.value.buffer);
+            const gas = value.getUint32(0, true); // Correct byte order
             updateSensorData('Gas', `${gas} Ohms`);
         }
 
         function handleLightChange(event) {
-            const light = event.target.value.getUint16(0, true);
+            const value = new DataView(event.target.value.buffer);
+            const light = value.getUint16(0, true); // Correct byte order
             updateSensorData('Light', `${light} lux`);
         }
 
         function handleAccelChange(event) {
-            const accelX = event.target.value.getInt16(0, true);
-            const accelY = event.target.value.getInt16(2, true);
-            const accelZ = event.target.value.getInt16(4, true);
+            const value = new DataView(event.target.value.buffer);
+            const accelX = value.getInt16(0, true);
+            const accelY = value.getInt16(2, true);
+            const accelZ = value.getInt16(4, true);
             updateSensorData('Acceleration', `X: ${accelX}, Y: ${accelY}, Z: ${accelZ}`);
         }
 
         function handleGyroChange(event) {
-            const gyroX = event.target.value.getInt16(0, true);
-            const gyroY = event.target.value.getInt16(2, true);
-            const gyroZ = event.target.value.getInt16(4, true);
+            const value = new DataView(event.target.value.buffer);
+            const gyroX = value.getInt16(0, true);
+            const gyroY = value.getInt16(2, true);
+            const gyroZ = value.getInt16(4, true);
             updateSensorData('Gyroscope', `X: ${gyroX}, Y: ${gyroY}, Z: ${gyroZ}`);
         }
 
