@@ -7,7 +7,7 @@
     <style>
         body { font-family: Arial, sans-serif; text-align: center; }
         #sensorData { font-size: 1.2em; margin: 20px 0; }
-        button { font-size: 1em; padding: 10px 20px; }
+        button { font-size: 1em; padding: 10px 20px; margin-top: 20px; }
     </style>
 </head>
 <body>
@@ -24,7 +24,7 @@
     </div>
 
     <script>
-        const SERVICE_UUID = "181a";
+        const SERVICE_UUID = "181a";  // Environmental Sensing Service UUID
         const CHAR_TEMP_UUID = "2a6e";
         const CHAR_PRESSURE_UUID = "2a6d";
         const CHAR_HUMIDITY_UUID = "2a6f";
@@ -32,24 +32,23 @@
         const CHAR_LIGHT_UUID = "2a77";
         const CHAR_ACCEL_UUID = "2a5a";
         const CHAR_GYRO_UUID = "2a5b";
+
         let device;
 
-        document.getElementById('connectButton').addEventListener('click', connectToDevice);
-
-        async function connectToDevice() {
+        document.getElementById('connectButton').addEventListener('click', async () => {
             try {
-                // Request the Bluetooth device
+                console.log("Requesting Bluetooth Device...");
                 device = await navigator.bluetooth.requestDevice({
                     filters: [{ services: [SERVICE_UUID] }]
                 });
 
-                // Connect to GATT Server
+                console.log("Connecting to GATT Server...");
                 const server = await device.gatt.connect();
 
-                // Get Environmental Sensing Service
+                console.log("Getting Environmental Sensing Service...");
                 const service = await server.getPrimaryService(SERVICE_UUID);
 
-                // Get Characteristics
+                // Get characteristics
                 const tempChar = await service.getCharacteristic(CHAR_TEMP_UUID);
                 const pressureChar = await service.getCharacteristic(CHAR_PRESSURE_UUID);
                 const humidityChar = await service.getCharacteristic(CHAR_HUMIDITY_UUID);
@@ -58,7 +57,7 @@
                 const accelChar = await service.getCharacteristic(CHAR_ACCEL_UUID);
                 const gyroChar = await service.getCharacteristic(CHAR_GYRO_UUID);
 
-                // Add event listeners for notifications
+                // Add event listeners for characteristic value changes
                 tempChar.addEventListener('characteristicvaluechanged', handleTempChange);
                 pressureChar.addEventListener('characteristicvaluechanged', handlePressureChange);
                 humidityChar.addEventListener('characteristicvaluechanged', handleHumidityChange);
@@ -67,7 +66,7 @@
                 accelChar.addEventListener('characteristicvaluechanged', handleAccelChange);
                 gyroChar.addEventListener('characteristicvaluechanged', handleGyroChange);
 
-                // Start notifications
+                // Start notifications for all characteristics
                 await tempChar.startNotifications();
                 await pressureChar.startNotifications();
                 await humidityChar.startNotifications();
@@ -76,14 +75,14 @@
                 await accelChar.startNotifications();
                 await gyroChar.startNotifications();
 
-                // Update UI
+                console.log('Connected and notifications started');
                 document.getElementById('connectButton').textContent = 'Connected';
             } catch (error) {
-                console.error('Error:', error);
+                console.error('Connection failed:', error);
             }
-        }
+        });
 
-        // Handle characteristic value changes
+        // Handle characteristic changes and update UI
         function handleTempChange(event) {
             const temp = event.target.value.getUint16(0, true) / 100;
             updateSensorData('Temperature', `${temp.toFixed(2)} °C`);
@@ -123,7 +122,7 @@
             updateSensorData('Gyroscope', `X: ${gyroX}, Y: ${gyroY}, Z: ${gyroZ}`);
         }
 
-        // Update the UI with new sensor data
+        // Update the sensor data in the UI
         function updateSensorData(sensorType, value) {
             const sensorDataDiv = document.getElementById('sensorData');
             const paragraphs = sensorDataDiv.getElementsByTagName('p');
