@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32 Test BLE Sensor</title>
+    <title>ESP32 BME680 BLE Sensor</title>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; }
         #sensorData { font-size: 1.2em; margin: 20px 0; }
@@ -17,28 +17,42 @@
         <p>Temperature: -- °C</p>
         <p>Pressure: -- hPa</p>
         <p>Humidity: -- %</p>
-        <p>Gas: -- KOhms</p>
+        <p>Gas: -- Ohms</p>
     </div>
 
     <script>
-        const serviceUUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
-        const characteristicUUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
-        let device, characteristic;
+        const SERVICE_UUID = "181a";
+        const CHAR_TEMP_UUID = "2a6e";
+        const CHAR_PRESSURE_UUID = "2a6d";
+        const CHAR_HUMIDITY_UUID = "2a6f";
+        const CHAR_GAS_UUID = "2a70";
+        let device;
 
         document.getElementById('connectButton').addEventListener('click', connectToDevice);
 
         async function connectToDevice() {
             try {
                 device = await navigator.bluetooth.requestDevice({
-                    filters: [{ services: [serviceUUID] }]
+                    filters: [{ services: [SERVICE_UUID] }]
                 });
 
                 const server = await device.gatt.connect();
-                const service = await server.getPrimaryService(serviceUUID);
-                characteristic = await service.getCharacteristic(characteristicUUID);
+                const service = await server.getPrimaryService(SERVICE_UUID);
 
-                await characteristic.startNotifications();
-                characteristic.addEventListener('characteristicvaluechanged', handleCharacteristicValueChanged);
+                const tempChar = await service.getCharacteristic(CHAR_TEMP_UUID);
+                const pressureChar = await service.getCharacteristic(CHAR_PRESSURE_UUID);
+                const humidityChar = await service.getCharacteristic(CHAR_HUMIDITY_UUID);
+                const gasChar = await service.getCharacteristic(CHAR_GAS_UUID);
+
+                tempChar.addEventListener('characteristicvaluechanged', handleTempChange);
+                pressureChar.addEventListener('characteristicvaluechanged', handlePressureChange);
+                humidityChar.addEventListener('characteristicvaluechanged', handleHumidityChange);
+                gasChar.addEventListener('characteristicvaluechanged', handleGasChange);
+
+                await tempChar.startNotifications();
+                await pressureChar.startNotifications();
+                await humidityChar.startNotifications();
+                await gasChar.startNotifications();
 
                 console.log('Connected to ESP32');
                 document.getElementById('connectButton').textContent = 'Connected';
@@ -47,14 +61,37 @@
             }
         }
 
-        function handleCharacteristicValueChanged(event) {
-            const value = new TextDecoder().decode(event.target.value);
-            const [temp, pressure, humidity, gas] = value.split(',');
+        function handleTempChange(event) {
+            const temp = event.target.value.getUint16(0, true) / 100;
             document.getElementById('sensorData').innerHTML = `
-                <p>Temperature: ${temp} °C</p>
-                <p>Pressure: ${pressure} hPa</p>
-                <p>Humidity: ${humidity} %</p>
-                <p>Gas: ${gas} KOhms</p>
+                <p>Temperature: ${temp.toFixed(2)} °C</p>
+                ${document.getElementById('sensorData').innerHTML.split('</p>').slice(1).join('</p>')}
+            `;
+        }
+
+        function handlePressureChange(event) {
+            const pressure = event.target.value.getUint32(0, true) / 100;
+            document.getElementById('sensorData').innerHTML = `
+                ${document.getElementById('sensorData').innerHTML.split('</p>')[0]}</p>
+                <p>Pressure: ${pressure.toFixed(2)} hPa</p>
+                ${document.getElementById('sensorData').innerHTML.split('</p>').slice(2).join('</p>')}
+            `;
+        }
+
+        function handleHumidityChange(event) {
+            const humidity = event.target.value.getUint16(0, true) / 100;
+            document.getElementById('sensorData').innerHTML = `
+                ${document.getElementById('sensorData').innerHTML.split('</p>').slice(0, 2).join('</p>')}
+                <p>Humidity: ${humidity.toFixed(2)} %</p>
+                ${document.getElementById('sensorData').innerHTML.split('</p>').slice(3).join('</p>')}
+            `;
+        }
+
+        function handleGasChange(event) {
+            const gas = event.target.value.getUint32(0, true);
+            document.getElementById('sensorData').innerHTML = `
+                ${document.getElementById('sensorData').innerHTML.split('</p>').slice(0, 3).join('</p>')}
+                <p>Gas: ${gas} Ohms</p>
             `;
         }
     </script>
