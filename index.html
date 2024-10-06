@@ -3,98 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ESP32 BME680 BLE Sensor</title>
-    <style>
-        body { font-family: Arial, sans-serif; text-align: center; }
-        #sensorData { font-size: 1.2em; margin: 20px 0; }
-        button { font-size: 1em; padding: 10px 20px; }
-    </style>
+    <title>ESP32 BME680 and BH1750 BLE Sensor</title>
 </head>
 <body>
-    <h1>ESP32 BME680 BLE Sensor</h1>
-    <button id="connectButton">Connect to ESP32</button>
+    <h1>ESP32 BME680 and BH1750 BLE Sensor</h1>
+    <button onclick="connect()">Connect to ESP32</button>
     <div id="sensorData">
-        <p>Temperature: -- °C</p>
-        <p>Pressure: -- hPa</p>
-        <p>Humidity: -- %</p>
-        <p>Gas: -- Ohms</p>
+        <p>Temperature: <span id="temperature">-- °C</span></p>
+        <p>Pressure: <span id="pressure">-- hPa</span></p>
+        <p>Humidity: <span id="humidity">-- %</span></p>
+        <p>Gas: <span id="gas">-- Ohms</span></p>
+        <p>Light: <span id="light">-- lux</span></p>
     </div>
-
     <script>
-        const SERVICE_UUID = "181a";
-        const CHAR_TEMP_UUID = "2a6e";
-        const CHAR_PRESSURE_UUID = "2a6d";
-        const CHAR_HUMIDITY_UUID = "2a6f";
-        const CHAR_GAS_UUID = "2a70";
-        let device;
+        const serviceUuid = '181a';
+        const tempCharacteristic = '2a6e';
+        const pressureCharacteristic = '2a6d';
+        const humidityCharacteristic = '2a6f';
+        const gasCharacteristic = '2a70';
+        const lightCharacteristic = '2a77';
 
-        document.getElementById('connectButton').addEventListener('click', connectToDevice);
+        let device, server, service;
 
-        async function connectToDevice() {
+        async function connect() {
             try {
-                console.log("Requesting Bluetooth Device...");
                 device = await navigator.bluetooth.requestDevice({
-                    filters: [{ services: [SERVICE_UUID] }]
+                    filters: [{ services: [serviceUuid] }]
                 });
+                server = await device.gatt.connect();
+                service = await server.getPrimaryService(serviceUuid);
+                
+                const characteristics = [
+                    tempCharacteristic,
+                    pressureCharacteristic,
+                    humidityCharacteristic,
+                    gasCharacteristic,
+                    lightCharacteristic
+                ];
 
-                console.log("Connecting to GATT Server...");
-                const server = await device.gatt.connect();
-
-                console.log("Getting Environmental Sensing Service...");
-                const service = await server.getPrimaryService(SERVICE_UUID);
-
-                console.log("Getting Characteristics...");
-                const tempChar = await service.getCharacteristic(CHAR_TEMP_UUID);
-                const pressureChar = await service.getCharacteristic(CHAR_PRESSURE_UUID);
-                const humidityChar = await service.getCharacteristic(CHAR_HUMIDITY_UUID);
-                const gasChar = await service.getCharacteristic(CHAR_GAS_UUID);
-
-                tempChar.addEventListener('characteristicvaluechanged', handleTempChange);
-                pressureChar.addEventListener('characteristicvaluechanged', handlePressureChange);
-                humidityChar.addEventListener('characteristicvaluechanged', handleHumidityChange);
-                gasChar.addEventListener('characteristicvaluechanged', handleGasChange);
-
-                console.log("Starting notifications...");
-                await tempChar.startNotifications();
-                await pressureChar.startNotifications();
-                await humidityChar.startNotifications();
-                await gasChar.startNotifications();
+                for (const uuid of characteristics) {
+                    const characteristic = await service.getCharacteristic(uuid);
+                    await characteristic.startNotifications();
+                    characteristic.addEventListener('characteristicvaluechanged', handleCharacteristic);
+                }
 
                 console.log('Connected to ESP32');
-                document.getElementById('connectButton').textContent = 'Connected';
             } catch (error) {
-                console.error('Error:', error);
+                console.error('Connection failed:', error);
             }
         }
 
-        function handleTempChange(event) {
-            const temp = event.target.value.getUint16(0, true) / 100;
-            updateSensorData('Temperature', `${temp.toFixed(2)} °C`);
-        }
+        function handleCharacteristic(event) {
+            const characteristic = event.target;
+            const value = characteristic.value;
 
-        function handlePressureChange(event) {
-            const pressure = event.target.value.getUint32(0, true) / 100;
-            updateSensorData('Pressure', `${pressure.toFixed(2)} hPa`);
-        }
-
-        function handleHumidityChange(event) {
-            const humidity = event.target.value.getUint16(0, true) / 100;
-            updateSensorData('Humidity', `${humidity.toFixed(2)} %`);
-        }
-
-        function handleGasChange(event) {
-            const gas = event.target.value.getUint32(0, true);
-            updateSensorData('Gas', `${gas} Ohms`);
-        }
-
-        function updateSensorData(sensorType, value) {
-            const sensorDataDiv = document.getElementById('sensorData');
-            const paragraphs = sensorDataDiv.getElementsByTagName('p');
-            for (let p of paragraphs) {
-                if (p.textContent.startsWith(sensorType)) {
-                    p.textContent = `${sensorType}: ${value}`;
-                    break;
-                }
+            if (characteristic.uuid === tempCharacteristic) {
+                const temp = value.getUint16(0, true) / 100;
+                document.getElementById('temperature').textContent = temp.toFixed(2) + ' °C';
+            } else if (characteristic.uuid === pressureCharacteristic) {
+                const pressure = value.getUint32(0, true) / 100;
+                document.getElementById('pressure').textContent = pressure.toFixed(2) + ' hPa';
+            } else if (characteristic.uuid === humidityCharacteristic) {
+                const humidity = value.getUint16(0, true) / 100;
+                document.getElementById('humidity').textContent = humidity.toFixed(2) + ' %';
+            } else if (characteristic.uuid === gasCharacteristic) {
+                const gas = value.getUint32(0, true);
+                document.getElementById('gas').textContent = gas + ' Ohms';
+            } else if (characteristic.uuid === lightCharacteristic) {
+                const light = value.getUint32(0, true) / 100;
+                document.getElementById('light').textContent = light.toFixed(2) + ' lux';
             }
         }
     </script>
