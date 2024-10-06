@@ -18,9 +18,6 @@
         <p>Pressure: -- hPa</p>
         <p>Humidity: -- %</p>
         <p>Gas: -- Ohms</p>
-        <p>Light: -- lux</p>
-        <p>Acceleration: X: -- , Y: -- , Z: -- m/s²</p>
-        <p>Gyroscope: X: -- , Y: -- , Z: -- deg/s</p>
     </div>
 
     <script>
@@ -29,9 +26,6 @@
         const CHAR_PRESSURE_UUID = "2a6d";
         const CHAR_HUMIDITY_UUID = "2a6f";
         const CHAR_GAS_UUID = "2a70";
-        const CHAR_LIGHT_UUID = "2a77";
-        const CHAR_ACCEL_UUID = "2713";
-        const CHAR_GYRO_UUID = "2a76";
         let device;
 
         document.getElementById('connectButton').addEventListener('click', connectToDevice);
@@ -54,26 +48,17 @@
                 const pressureChar = await service.getCharacteristic(CHAR_PRESSURE_UUID);
                 const humidityChar = await service.getCharacteristic(CHAR_HUMIDITY_UUID);
                 const gasChar = await service.getCharacteristic(CHAR_GAS_UUID);
-                const lightChar = await service.getCharacteristic(CHAR_LIGHT_UUID);
-                const accelChar = await service.getCharacteristic(CHAR_ACCEL_UUID);
-                const gyroChar = await service.getCharacteristic(CHAR_GYRO_UUID);
 
                 tempChar.addEventListener('characteristicvaluechanged', handleTempChange);
                 pressureChar.addEventListener('characteristicvaluechanged', handlePressureChange);
                 humidityChar.addEventListener('characteristicvaluechanged', handleHumidityChange);
                 gasChar.addEventListener('characteristicvaluechanged', handleGasChange);
-                lightChar.addEventListener('characteristicvaluechanged', handleLightChange);
-                accelChar.addEventListener('characteristicvaluechanged', handleAccelChange);
-                gyroChar.addEventListener('characteristicvaluechanged', handleGyroChange);
 
                 console.log("Starting notifications...");
                 await tempChar.startNotifications();
                 await pressureChar.startNotifications();
                 await humidityChar.startNotifications();
                 await gasChar.startNotifications();
-                await lightChar.startNotifications();
-                await accelChar.startNotifications();
-                await gyroChar.startNotifications();
 
                 console.log('Connected to ESP32');
                 document.getElementById('connectButton').textContent = 'Connected';
@@ -84,41 +69,26 @@
 
         function handleTempChange(event) {
             const temp = event.target.value.getUint16(0, true) / 100;
+            console.log("Temperature:", temp);
             updateSensorData('Temperature', `${temp.toFixed(2)} °C`);
         }
 
         function handlePressureChange(event) {
             const pressure = event.target.value.getUint32(0, true) / 100;
+            console.log("Pressure:", pressure);
             updateSensorData('Pressure', `${pressure.toFixed(2)} hPa`);
         }
 
         function handleHumidityChange(event) {
             const humidity = event.target.value.getUint16(0, true) / 100;
+            console.log("Humidity:", humidity);
             updateSensorData('Humidity', `${humidity.toFixed(2)} %`);
         }
 
         function handleGasChange(event) {
             const gas = event.target.value.getUint32(0, true);
+            console.log("Gas:", gas);
             updateSensorData('Gas', `${gas} Ohms`);
-        }
-
-        function handleLightChange(event) {
-            const lux = event.target.value.getUint16(0, true);
-            updateSensorData('Light', `${lux.toFixed(2)} lux`);
-        }
-
-        function handleAccelChange(event) {
-            const x = event.target.value.getFloat32(0, true);
-            const y = event.target.value.getFloat32(4, true);
-            const z = event.target.value.getFloat32(8, true);
-            updateSensorData('Acceleration', `X: ${x.toFixed(2)}, Y: ${y.toFixed(2)}, Z: ${z.toFixed(2)} m/s²`);
-        }
-
-        function handleGyroChange(event) {
-            const x = event.target.value.getFloat32(0, true);
-            const y = event.target.value.getFloat32(4, true);
-            const z = event.target.value.getFloat32(8, true);
-            updateSensorData('Gyroscope', `X: ${x.toFixed(2)}, Y: ${y.toFixed(2)}, Z: ${z.toFixed(2)} deg/s`);
         }
 
         function updateSensorData(sensorType, value) {
